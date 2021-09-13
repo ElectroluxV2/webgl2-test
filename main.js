@@ -108,40 +108,46 @@ class GlRenderer {
 
     #initializeShaders() {
         // Vertex shader source code.
-        const vertCode = [
-        'uniform mat4 uMapMatrix;',
-        'attribute vec2 aWorldCoords;',
-        'attribute vec3 aColor;',
-        'varying vec3 vColor;',
-        'void main(void) {',
-        '  gl_Position = uMapMatrix * vec4(aWorldCoords, 0.0, 1.0);',
-        '  vColor = aColor;',
-        '}'
-        ].join('\n');
+        const vertexShaderCode = 
+            `#version 300 es
+            in vec2 a_position;
+            in vec3 aColor;
+            out vec3 vColor;
+            uniform vec2 u_resolution;
+
+            void main(void) {
+                vec2 zeroToOne = a_position / u_resolution;
+                vec2 zeroToTwo = zeroToOne * 2.0;
+                vec2 clipSpace = zeroToTwo - 1.0;
+                gl_Position = vec4(a_position, 0.0, 1.0);
+                // gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
+                vColor = aColor;
+            }`;
 
         // Create a vertex shader object.
         const vertShader = this.#gl.createShader(this.#gl.VERTEX_SHADER);
 
         // Compile the vertex shader.
-        if (!this.#compileShader(vertCode, vertShader)) {
+        if (!this.#compileShader(vertexShaderCode, vertShader)) {
             throw new Error('Unable to compile vertex shader:' + this.#gl.getShaderInfoLog(vertShader));
         }
 
         // Fragment shader source code.
-        const fragCode = [
-        'precision mediump float;',
-        'varying vec3 vColor;',
-        'void main(void) {',
-        '  gl_FragColor = vec4(vColor, 1.0);',
-        '}'
-        ].join('\n');
+        const fragmentShaderCode = 
+            `#version 300 es
+            precision mediump float;
+            in vec3 vColor;
+            out vec4 oColor;
+            void main(void) {
+                oColor = vec4(vColor, 1.0);
+            }`;
 
         // Create fragment shader object.
         const fragShader = this.#gl.createShader(this.#gl.FRAGMENT_SHADER);
 
         // Compile the fragment shader.
-        if (!this.#compileShader(fragCode, fragShader)) {
-        throw new Error('Unable to compile fragment shader:\n' + this.#gl.getShaderInfoLog(fragShader));
+        if (!this.#compileShader(fragmentShaderCode, fragShader)) {
+            throw new Error('Unable to compile fragment shader:\n' + this.#gl.getShaderInfoLog(fragShader));
         }
 
         // Create a shader program object to store combined shader program.
@@ -155,6 +161,9 @@ class GlRenderer {
 
         // Link both programs.
         this.#gl.linkProgram(this.#shaderProgram);
+
+        const success = this.#gl.getProgramParameter(this.#shaderProgram, this.#gl.LINK_STATUS);
+        console.log(success);
 
         // Use the combined shader program object
         this.#gl.useProgram(this.#shaderProgram);
@@ -184,16 +193,15 @@ class GlRenderer {
             this.#addTriangle();
         }
 
+        const resolutionUniformLocation = this.#gl.getUniformLocation(this.#shaderProgram, 'u_resolution');
+        this.#gl.uniform2f(resolutionUniformLocation, this.#gl.canvas.width, this.#gl.canvas.height);
+
         // Create a new buffer object
         const vertexBuffer = this.#gl.createBuffer();
 
         // Bind an empty array buffer to it
         this.#gl.bindBuffer(this.#gl.ARRAY_BUFFER, vertexBuffer);
-
-        // Pass the vertices data to the buffer
         this.#gl.bufferData(this.#gl.ARRAY_BUFFER, new Float32Array(this.#vertices), this.#gl.STATIC_DRAW);
-
-        // Unbind the buffer
         this.#gl.bindBuffer(this.#gl.ARRAY_BUFFER, null);
 
         // Create an empty buffer object and store color data
@@ -205,21 +213,13 @@ class GlRenderer {
         this.#gl.bindBuffer(this.#gl.ARRAY_BUFFER, vertexBuffer);
 
         // Get the attribute location
-        const coords = this.#gl.getAttribLocation(this.#shaderProgram, "aWorldCoords");
-
-        // point an attribute to the currently bound VBO
-        this.#gl.vertexAttribPointer(coords, 2, this.#gl.FLOAT, false, 0, 0);
-
-        // Enable the attribute
-        this.#gl.enableVertexAttribArray(coords);
+        const a_position = this.#gl.getAttribLocation(this.#shaderProgram, "a_position");
+        this.#gl.vertexAttribPointer(a_position, 2, this.#gl.FLOAT, false, 0, 0);
+        this.#gl.enableVertexAttribArray(a_position);
 
         // bind the color buffer
         this.#gl.bindBuffer(this.#gl.ARRAY_BUFFER, colorBuffer);
-
-        // get the attribute location
         const color = this.#gl.getAttribLocation(this.#shaderProgram, "aColor");
-
-        // point attribute to the color buffer object
         this.#gl.vertexAttribPointer(color, 3, this.#gl.FLOAT, false, 0, 0);
 
         // enable the color attribute
@@ -228,13 +228,13 @@ class GlRenderer {
         /* Step5: Drawing the required object (triangle) */
 
         // Clear the canvas
-        this.#gl.clearColor(1, 1, 0, 0);
+        // this.#gl.clearColor(1, 1, 0, 0);
 
-        this.#worldToClipSpace.set([
-            2, 0, 0, 0,
-            0, -2, 0, 0,
-            0, 0, 0, 0, -1, 1, 0, 1
-        ]);
+        // this.#worldToClipSpace.set([
+        //     2, 0, 0, 0,
+        //     0, -2, 0, 0,
+        //     0, 0, 0, 0, -1, 1, 0, 1
+        // ]);
     }
 
     #initializeUniforms() {
